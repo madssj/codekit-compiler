@@ -52,7 +52,23 @@ JS_PREPEND_RE = re.compile(r'^// prepend file: ([^ ]+)$', re.M)
 CWD = os.getcwd()
 
 def handle_less(inpath, outpath, options):
-  subprocess.call([LESSC] + LESSC_OPTIONS + [inpath, outpath])
+  def get_autoprefixer_config():
+      autoprefixer_config = config['projectSettings']['autoprefixerBrowserString']
+
+      # fix an issue with less-plugin-autoprefixer which should be fixed in PR#12
+      import re
+      return re.sub("\s*,\s*", ",", autoprefixer_config)
+
+
+  global config
+
+  # make a copy of the options so we can alter them
+  less_options = list(LESSC_OPTIONS)
+
+  if options.get('shouldRunAutoprefixer', 0) == 1:
+    less_options.append('--autoprefix=%s' % get_autoprefixer_config())
+
+  subprocess.call([LESSC] + less_options + [inpath, outpath])
 
 def handle_javascript(inpath, outpath, options):
   append_files = JS_PREPEND_RE.findall(open(inpath, 'r').read())
