@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
+# vim: set expandtab ts=2 sw=2
 # The MIT License (MIT)
 #
 # Copyright (c) 2015 Mads Sülau Jørgensen
@@ -24,9 +25,7 @@
 #
 # Find the newest version at https://github.com/madssj/codekit-compiler
 
-# vim: ts=2:sw=2:expandtab
 import os
-import re
 import json
 import subprocess
 import tempfile
@@ -47,18 +46,15 @@ LESSC_OPTIONS = [
 
 UGLIFYJS = 'node_modules/.bin/uglifyjs'
 
-JS_PREPEND_RE = re.compile(r'^// prepend file: ([^ ]+)$', re.M)
-
 CWD = os.getcwd()
 
-def handle_less(inpath, outpath, options):
+def handle_less(inname, inpath, outname, outpath, options):
   def get_autoprefixer_config():
       autoprefixer_config = config['projectSettings']['autoprefixerBrowserString']
 
       # fix an issue with less-plugin-autoprefixer which should be fixed in PR#12
       import re
       return re.sub("\s*,\s*", ",", autoprefixer_config)
-
 
   global config
 
@@ -70,8 +66,17 @@ def handle_less(inpath, outpath, options):
 
   subprocess.call([LESSC] + less_options + [inpath, outpath])
 
-def handle_javascript(inpath, outpath, options):
-  append_files = JS_PREPEND_RE.findall(open(inpath, 'r').read())
+def handle_javascript(inname, inpath, outname, outpath, options):
+  global config
+
+  append_files = []
+  manual_imports = config.get('manualImportLinks', {}).get(inname)
+
+  if manual_imports:
+    append_files = [CWD + f['linkedFileAbbreviatedPath']
+      for f in sorted(manual_imports, key=lambda x: x['position'])
+    ]
+
   indir = os.path.dirname(inpath)
   tmpfile = tempfile.NamedTemporaryFile()
 
@@ -103,8 +108,8 @@ for filename, options in files.iteritems():
   handler = handler_map.get(filetype)
 
   if handler:
-    print "handling", inpath
+    print "handling", inpath, ">", outpath
 
-    handler(CWD + inpath, CWD + outpath, options)
+    handler(inpath, CWD + inpath, outpath, CWD + outpath, options)
   else:
     print "no handler for file", filename
